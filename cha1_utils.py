@@ -1,8 +1,12 @@
-def check_solution(s, p):
+from time import perf_counter
+
+def check_solution(s, p, proc, tmax, rmax):
     """
     s is the initial string (list of 0s and 1s)
     p the proposed subsequence (list of 1-indexed positions)
     """
+    t0, r0 = perf_counter(), proc.memory_info().rss
+
     n = len(s)
     
     # Handle empty subsequence
@@ -31,4 +35,10 @@ def check_solution(s, p):
     remaining = [s[i] for i in range(n) if i not in p_set]
     
     # Check if remaining is a palindrome
-    return remaining == remaining[::-1]
+    is_an_accurate_answer = (remaining == remaining[::-1])
+
+    # Measure time and memory
+    t1, r1 = perf_counter(), proc.memory_info().rss
+    is_an_efficient_answer = (t1-t0 <= tmax, r1-r0 <= rmax)
+
+    return (is_an_accurate_answer, is_an_efficient_answer[0], is_an_efficient_answer[1])
