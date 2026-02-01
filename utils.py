@@ -1,3 +1,9 @@
+"""
+Utility functions for evaluating coding challenge solutions.
+
+By Alexandre Le Mercier
+"""
+
 from time import perf_counter
 from psutil import Process
 import os

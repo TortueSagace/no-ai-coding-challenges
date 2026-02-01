@@ -1,3 +1,10 @@
+"""
+Utility functions for Challenge 1: Beautiful String.
+
+By Alexandre Le Mercier
+"""
+
+
 from time import perf_counter
 
 def check_solution(test_input, result, proc, tmax, rmax):
