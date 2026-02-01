@@ -130,6 +130,53 @@ def parse_samples(sample_input):
     pass
 ```
 
+#### Optional Functions (Recommended)
+
+These functions improve the sample test output display:
+
+```python
+def format_input(sample):
+    """
+    Format a test input for display in the results table.
+    
+    Parameters:
+    -----------
+    sample : tuple
+        The test input (e.g., (n, s) for challenge 1)
+    
+    Returns:
+    --------
+    str : Formatted string for display
+    
+    Example:
+        n, s = sample
+        return f"n={n}, s={''.join(str(x) for x in s)}"
+    """
+    pass
+
+
+def format_output(result):
+    """
+    Format a solution output for display in the results table.
+    
+    Parameters:
+    -----------
+    result : any
+        The return value from my_solution()
+    
+    Returns:
+    --------
+    str : Formatted string for display
+    
+    Example:
+        if result is None:
+            return "None"
+        k, indices = result
+        return f"k={k}, p={indices}"
+    """
+    pass
+```
+
 ### 2. `chaX_tests.txt` - Test Cases File
 
 Format:
@@ -165,8 +212,26 @@ Format:
 
 The `utils.py` file provides shared functionality:
 
-### `evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory_limit)`
-Evaluates the solution on provided sample test cases.
+### `evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory_limit, format_input=None, format_output=None)`
+Evaluates the solution on provided sample test cases with a detailed results table.
+
+**Parameters:**
+- `format_input`: Optional function to format input for display: `format_input(sample) -> str`
+- `format_output`: Optional function to format output for display: `format_output(result) -> str`
+
+**Output Example:**
+```
+                         Sample Test Results                         
+=====================================================================
+   # │ Input           │ Output           │         Time │ Status    
+─────┼─────────────────┼──────────────────┼──────────────┼───────────
+   1 │ n=3, s=010      │ k=0, p=[]        │     260.0 μs │ ✅ Pass    
+   2 │ n=3, s=001      │ k=2, p=[1, 2]    │      87.8 μs │ ✅ Pass    
+   3 │ n=5, s=00111    │ k=2, p=[1, 2]    │      52.1 μs │ ✅ Pass    
+
+============================================================
+✅  All 3 sample tests passed!
+```
 
 ### `internal_evaluation(test_file_path, my_solution, check_solution, parse_tests, time_limit, memory_limit, get_input_size=None, plot=True, plot_title="", show_estimation=True)`
 Evaluates on hidden test cases with optional complexity analysis plotting.
@@ -207,8 +272,12 @@ def my_solution(param1, param2, ...):
     # User implements their solution here
     pass
 
-# Cell 4: Sample evaluation
-evaluate_on_samples(samples, my_solution, check_solution, TIME_LIMIT, MEMORY_LIMIT)
+# Cell 4: Sample evaluation (with optional formatting)
+evaluate_on_samples(
+    samples, my_solution, check_solution, TIME_LIMIT, MEMORY_LIMIT,
+    format_input=format_input,   # Optional: from chaX_utils
+    format_output=format_output  # Optional: from chaX_utils
+)
 
 # Cell 5: Full evaluation
 test_file_path = 'no-ai-coding-challenges/chaX_tests.txt'
@@ -230,6 +299,35 @@ When `get_input_size` is provided, the evaluation automatically:
 3. Fits various complexity functions (O(1), O(log n), O(n), O(n log n), O(n²), O(n³), O(2ⁿ))
 4. Plots the results with the best-fit curve
 5. Reports estimated time and space complexity
+
+## Collapsible Content (Solutions, Hints)
+
+To hide solutions or hints by default, use HTML `<details>` and `<summary>` tags in markdown cells:
+
+```html
+<details>
+<summary><strong>💡 Click to reveal Solution Explanation</strong></summary>
+
+<div style="color: black; background-color: #cce5ff; padding: 10px; border-left: 5px solid #3399ff; border-radius: 5px; margin-top: 10px;">
+    Your solution explanation here...
+    
+    <strong>Strategy:</strong>
+    <ol>
+        <li>Step 1</li>
+        <li>Step 2</li>
+    </ol>
+</div>
+
+</details>
+```
+
+This renders as a collapsed element that users must click to expand, keeping solutions hidden until explicitly requested.
+
+**Color schemes for different box types:**
+- **Blue (info/solution):** `background-color: #cce5ff; border-left: 5px solid #3399ff;`
+- **Yellow (warning/hint):** `background-color: #fff3cd; border-left: 5px solid #ffc107;`
+- **Red (important):** `background-color: #ffcccc; border-left: 5px solid #ff3333;`
+- **Green (success):** `background-color: #d4edda; border-left: 5px solid #28a745;`
 
 ## Tips for Challenge Creators
 
