@@ -1,114 +1,132 @@
 from time import perf_counter
-import sys, os
-from io import StringIO
 from psutil import Process
+import os
+from tqdm.notebook import tqdm
 
 def get_trss(proc):
+    """Get current time and RSS memory usage."""
     return perf_counter(), proc.memory_info().rss
 
-def rigid_evaluation_on_provided_examples(cap, sample_output, proc, t0, r0, tmax, rmax):
-    correct = True
-    try:
-        assert len(cap.stdout.strip()) > 0, "❌  no output found! Did you forget '%%capture cap'?"
-        assert cap.stdout.strip() == sample_output.strip(), "❌  output differs!"
-        print("✅  matches expected output")
-    except AssertionError as e:
-        print(e)
-        correct = False
 
-    t1, r1 = get_trss(proc)
-
-    print(f"Time (sec): {t1-t0:>10.3e}")
-    print(f"RSS (B): {r1-r0:>13.3e}")
-    try:
-        assert (t1-t0 <= tmax and r1-r0 <= rmax), "❌  your code isn't efficient enough! Check time/space limits."
-        print("✅  efficient enough")
-    except AssertionError as e:
-        print(e)
-        correct = False
-
-    return correct
-
-def internal_evaluation(test_file_path, my_solution, check_solution, TIME_LIMIT, MEMORY_LIMIT):
-
-    # Read hidden test cases from git repository
-    test_file_path = 'no-ai-coding-challenges/cha1_tests.txt'
-
-    if not os.path.exists(test_file_path):
-        print("❌  Test file not found! Please ensure the git repository contains 'cha1_tests.txt'")
-    else:
-        with open(test_file_path, 'r') as f:
-            hidden_tests = f.read()
-        
-        # Parse the input to get test cases
-        input_lines = hidden_tests.strip().split('\n')
-        t = int(input_lines[0])
-        
-        # Prepare input for my_solution
-        sys.stdin = StringIO(hidden_tests)
-        
-        # Capture output
-        output_capture = StringIO()
-        old_stdout = sys.stdout
-        sys.stdout = output_capture
-        
-        # Run user's solution
-        proc = Process(os.getpid())
+def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory_limit):
+    """
+    Evaluate a solution on provided sample test cases.
+    
+    Parameters:
+    -----------
+    samples : list of tuples
+        Each tuple contains the inputs for my_solution (e.g., (n, s) for challenge 1)
+    my_solution : callable
+        Function that takes unpacked sample inputs and returns the solution
+    check_solution : callable
+        Function with signature check_solution(sample, result, proc, tmax, rmax)
+        Returns (is_accurate, is_time_efficient, is_memory_efficient)
+    time_limit : float
+        Maximum allowed time in seconds
+    memory_limit : float
+        Maximum allowed memory in bytes
+    
+    Returns:
+    --------
+    bool : True if all tests passed
+    """
+    proc = Process(os.getpid())
+    all_passed = True
+    
+    for i, sample in enumerate(samples, 1):
         try:
-            my_solution()
-            sys.stdout = old_stdout
+            result = my_solution(*sample)
         except Exception as e:
-            sys.stdout = old_stdout
-            print(f"❌  Runtime error: {e}")
-            raise
+            print(f"❌  Runtime error at sample {i}: {e}")
+            return False
         
-        # Parse outputs
-        output_lines = output_capture.getvalue().strip().split('\n')
-        output_idx = 0
+        is_accurate, is_time_efficient, is_memory_efficient = check_solution(
+            sample, result, proc, time_limit, memory_limit
+        )
         
-        # Parse inputs to check against
-        input_idx = 1
-        all_passed = True
+        if not is_accurate:
+            print(f"❌  Wrong answer at sample {i}")
+            all_passed = False
+            break
+        elif not is_time_efficient:
+            print(f"❌  Maximum time exceeded at sample {i}")
+            all_passed = False
+            break
+        elif not is_memory_efficient:
+            print(f"❌  Maximum memory exceeded at sample {i}")
+            all_passed = False
+            break
+    
+    if all_passed:
+        print(f"✅  All {len(samples)} sample tests passed!")
+    
+    return all_passed
+
+
+def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests, time_limit, memory_limit):
+    """
+    Evaluate a solution on hidden test cases from a file.
+    
+    Parameters:
+    -----------
+    test_file_path : str
+        Path to the test file
+    my_solution : callable
+        Function that takes test inputs and returns the solution
+    check_solution : callable
+        Function with signature check_solution(test_input, result, proc, tmax, rmax)
+        Returns (is_accurate, is_time_efficient, is_memory_efficient)
+    parse_tests : callable
+        Function that parses the test file and returns a list of test inputs
+        Signature: parse_tests(file_path) -> list of tuples
+    time_limit : float
+        Maximum allowed time in seconds
+    memory_limit : float
+        Maximum allowed memory in bytes
+    
+    Returns:
+    --------
+    bool : True if all tests passed
+    """
+    if not os.path.exists(test_file_path):
+        print(f"❌  Test file not found: {test_file_path}")
+        return False
+    
+    # Parse test cases using the challenge-specific parser
+    tests = parse_tests(test_file_path)
+    
+    if not tests:
+        print("❌  No test cases found in file")
+        return False
+    
+    proc = Process(os.getpid())
+    all_passed = True
+    
+    for test_num, test_input in tqdm(enumerate(tests, 1)):
+        try:
+            result = my_solution(*test_input)
+        except Exception as e:
+            print(f"❌  Runtime error at test {test_num}: {e}")
+            return False
         
-        for test_num in range(1, t + 1):
-            # Read the input for this test
-            n = int(input_lines[input_idx])
-            s = [int(c) for c in input_lines[input_idx + 1].strip()]
-            input_idx += 2
-            
-            # Read the output for this test
-            try:
-                k = int(output_lines[output_idx])
-                output_idx += 1
-                
-                if k == 0:
-                    p = []
-                    # Skip empty line if present
-                    if output_idx < len(output_lines) and output_lines[output_idx].strip() == '':
-                        output_idx += 1
-                else:
-                    p = list(map(int, output_lines[output_idx].split()))
-                    output_idx += 1
-            except Exception as e:
-                print(f"❌  Wrong answer at test {test_num} (output parsing error: {e})")
-                all_passed = False
-                break
-            
-            # Check solution
-            is_accurate, is_time_efficient, is_memory_efficient = check_solution(s, p, proc, TIME_LIMIT, MEMORY_LIMIT)
-            
-            if not is_accurate:
-                print(f"❌  Wrong answer at test {test_num}")
-                all_passed = False
-                break
-            elif not is_time_efficient:
-                print(f"❌  Maximum time exceeded at test {test_num}")
-                all_passed = False
-                break
-            elif not is_memory_efficient:
-                print(f"❌  Maximum memory exceeded at test {test_num}")
-                all_passed = False
-                break
+        is_accurate, is_time_efficient, is_memory_efficient = check_solution(
+            test_input, result, proc, time_limit, memory_limit
+        )
         
-        if all_passed:
-            print("✅  All tests passed!")
+        if not is_accurate:
+            print(f"❌  Wrong answer at test {test_num}")
+            all_passed = False
+            break
+        elif not is_time_efficient:
+            print(f"❌  Maximum time exceeded at test {test_num}")
+            all_passed = False
+            break
+        elif not is_memory_efficient:
+            print(f"❌  Maximum memory exceeded at test {test_num}")
+            all_passed = False
+            break
+    
+    if all_passed:
+        print(f"✅  All {len(tests)} tests passed!")
+    
+    return all_passed
