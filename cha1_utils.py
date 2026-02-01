@@ -1,11 +1,22 @@
-"""
-Utility functions for Challenge 1: Beautiful String.
-
-By Alexandre Le Mercier
-"""
-
-
 from time import perf_counter
+
+
+def get_input_size(test_input):
+    """
+    Extract the input size (n) from the test input for complexity analysis.
+    
+    Parameters:
+    -----------
+    test_input : tuple
+        (n, s) where n is the length and s is the binary string
+    
+    Returns:
+    --------
+    int : The input size n
+    """
+    n, s = test_input
+    return n
+
 
 def check_solution(test_input, result, proc, tmax, rmax):
     """
