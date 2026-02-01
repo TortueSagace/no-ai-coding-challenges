@@ -108,7 +108,7 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
     
     proc = Process(os.getpid())
     all_passed = True
-    for test_num, test_input in tqdm(enumerate(tests, 1)):
+    for test_num, test_input in tqdm(enumerate(tests, 1), total=len(tests)):
         try:
             user_result = my_solution(*test_input)
         except Exception as e:
