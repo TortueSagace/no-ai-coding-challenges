@@ -1,6 +1,7 @@
 from time import perf_counter
 from psutil import Process
 import os
+from tqdm.auto import tqdm
 
 def get_trss(proc):
     """Get current time and RSS memory usage."""
@@ -107,8 +108,7 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
     
     proc = Process(os.getpid())
     all_passed = True
-    
-    for test_num, test_input in enumerate(tests, 1):
+    for test_num, test_input in tqdm(enumerate(tests, 1)):
         try:
             user_result = my_solution(*test_input)
         except Exception as e:
