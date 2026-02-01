@@ -12,9 +12,10 @@ def get_trss(proc):
     return perf_counter(), proc.memory_info().rss
 
 
-def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory_limit):
+def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory_limit,
+                        format_input=None, format_output=None):
     """
-    Evaluate a solution on provided sample test cases.
+    Evaluate a solution on provided sample test cases with detailed output table.
     
     Parameters:
     -----------
@@ -29,6 +30,12 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
         Maximum allowed time in seconds
     memory_limit : float
         Maximum allowed memory in bytes
+    format_input : callable, optional
+        Function to format input for display: format_input(sample) -> str
+        If None, uses default repr with truncation
+    format_output : callable, optional
+        Function to format output for display: format_output(result) -> str
+        If None, uses default repr with truncation
     
     Returns:
     --------
@@ -37,41 +44,150 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
     proc = Process(os.getpid())
     all_passed = True
     
+    # Collect results for table display
+    results_table = []
+    
     for i, sample in enumerate(samples, 1):
+        # Measure execution
+        t_start = perf_counter()
+        mem_before = proc.memory_info().rss
+        
         try:
             user_result = my_solution(*sample)
+            runtime_error = None
         except Exception as e:
-            print(f"❌  Runtime error at sample {i}: {e}")
-            return False
+            user_result = None
+            runtime_error = str(e)
         
-        check_result = check_solution(
-            sample, user_result, proc, time_limit, memory_limit
-        )
+        t_end = perf_counter()
+        mem_after = proc.memory_info().rss
         
-        # Unpack result (supports optional 4th element for custom error message)
-        is_accurate, is_time_efficient, is_memory_efficient = check_result[:3]
-        custom_message = check_result[3] if len(check_result) > 3 else None
+        exec_time = t_end - t_start
+        mem_used = max(0, mem_after - mem_before)
+        
+        # Check solution
+        if runtime_error:
+            is_accurate = False
+            custom_message = f"Runtime error: {runtime_error}"
+        else:
+            check_result = check_solution(
+                sample, user_result, proc, time_limit, memory_limit
+            )
+            is_accurate, is_time_efficient, is_memory_efficient = check_result[:3]
+            custom_message = check_result[3] if len(check_result) > 3 else None
+        
+        # Format input/output for display
+        if format_input:
+            input_str = format_input(sample)
+        else:
+            input_str = _truncate_repr(sample, 40)
+        
+        if format_output:
+            output_str = format_output(user_result)
+        else:
+            output_str = _truncate_repr(user_result, 30)
+        
+        # Determine status
+        if runtime_error:
+            status = "❌ Error"
+            status_detail = runtime_error[:30] + "..." if len(runtime_error) > 30 else runtime_error
+        elif not is_accurate:
+            status = "❌ Wrong"
+            status_detail = custom_message if custom_message else "Invalid answer"
+        else:
+            status = "✅ Pass"
+            status_detail = ""
+        
+        results_table.append({
+            'index': i,
+            'input': input_str,
+            'output': output_str,
+            'time_us': exec_time * 1e6,
+            'status': status,
+            'status_detail': status_detail
+        })
         
         if not is_accurate:
-            if custom_message:
-                print(f"❌  {custom_message}")
-            else:
-                print(f"❌  Wrong answer at sample {i}")
             all_passed = False
-            break
-        elif not is_time_efficient:
-            print(f"❌  Maximum time exceeded at sample {i}")
-            all_passed = False
-            break
-        elif not is_memory_efficient:
-            print(f"❌  Maximum memory exceeded at sample {i}")
-            all_passed = False
-            break
     
+    # Display results table
+    _print_results_table(results_table)
+    
+    # Summary
+    passed_count = sum(1 for r in results_table if r['status'] == "✅ Pass")
+    print(f"\n{'='*60}")
     if all_passed:
         print(f"✅  All {len(samples)} sample tests passed!")
+    else:
+        print(f"❌  {passed_count}/{len(samples)} sample tests passed")
+        # Show first failure detail
+        for r in results_table:
+            if r['status'] != "✅ Pass" and r['status_detail']:
+                print(f"    First failure: {r['status_detail']}")
+                break
     
     return all_passed
+
+
+def _truncate_repr(obj, max_len):
+    """Truncate string representation of an object."""
+    s = repr(obj)
+    if len(s) > max_len:
+        return s[:max_len-3] + "..."
+    return s
+
+
+def _print_results_table(results):
+    """Print a formatted results table."""
+    # Calculate column widths
+    col_widths = {
+        'index': 4,
+        'input': max(5, max(len(r['input']) for r in results)),
+        'output': max(6, max(len(r['output']) for r in results)),
+        'time': 12,
+        'status': 10
+    }
+    
+    # Cap widths to prevent overflow
+    col_widths['input'] = min(col_widths['input'], 45)
+    col_widths['output'] = min(col_widths['output'], 35)
+    
+    # Header
+    header = (f"{'#':>{col_widths['index']}} │ "
+              f"{'Input':<{col_widths['input']}} │ "
+              f"{'Output':<{col_widths['output']}} │ "
+              f"{'Time':>{col_widths['time']}} │ "
+              f"{'Status':<{col_widths['status']}}")
+    
+    separator = "─" * (col_widths['index'] + 1) + "┼" + \
+                "─" * (col_widths['input'] + 2) + "┼" + \
+                "─" * (col_widths['output'] + 2) + "┼" + \
+                "─" * (col_widths['time'] + 2) + "┼" + \
+                "─" * (col_widths['status'] + 1)
+    
+    print(f"\n{'Sample Test Results':^{len(header)}}")
+    print("=" * len(header))
+    print(header)
+    print(separator)
+    
+    # Rows
+    for r in results:
+        # Format time
+        if r['time_us'] < 1000:
+            time_str = f"{r['time_us']:.1f} μs"
+        else:
+            time_str = f"{r['time_us']/1000:.2f} ms"
+        
+        # Truncate if needed
+        input_str = r['input'][:col_widths['input']]
+        output_str = r['output'][:col_widths['output']]
+        
+        row = (f"{r['index']:>{col_widths['index']}} │ "
+               f"{input_str:<{col_widths['input']}} │ "
+               f"{output_str:<{col_widths['output']}} │ "
+               f"{time_str:>{col_widths['time']}} │ "
+               f"{r['status']:<{col_widths['status']}}")
+        print(row)
 
 
 def _fit_complexity(n_values, measurements):
