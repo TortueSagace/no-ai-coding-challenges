@@ -1,7 +1,6 @@
 from time import perf_counter
 from psutil import Process
 import os
-from tqdm.notebook import tqdm
 
 def get_trss(proc):
     """Get current time and RSS memory usage."""
@@ -35,17 +34,24 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
     
     for i, sample in enumerate(samples, 1):
         try:
-            result = my_solution(*sample)
+            user_result = my_solution(*sample)
         except Exception as e:
             print(f"❌  Runtime error at sample {i}: {e}")
             return False
         
-        is_accurate, is_time_efficient, is_memory_efficient = check_solution(
-            sample, result, proc, time_limit, memory_limit
+        check_result = check_solution(
+            sample, user_result, proc, time_limit, memory_limit
         )
         
+        # Unpack result (supports optional 4th element for custom error message)
+        is_accurate, is_time_efficient, is_memory_efficient = check_result[:3]
+        custom_message = check_result[3] if len(check_result) > 3 else None
+        
         if not is_accurate:
-            print(f"❌  Wrong answer at sample {i}")
+            if custom_message:
+                print(f"❌  {custom_message}")
+            else:
+                print(f"❌  Wrong answer at sample {i}")
             all_passed = False
             break
         elif not is_time_efficient:
@@ -102,19 +108,26 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
     proc = Process(os.getpid())
     all_passed = True
     
-    for test_num, test_input in tqdm(enumerate(tests, 1)):
+    for test_num, test_input in enumerate(tests, 1):
         try:
-            result = my_solution(*test_input)
+            user_result = my_solution(*test_input)
         except Exception as e:
             print(f"❌  Runtime error at test {test_num}: {e}")
             return False
         
-        is_accurate, is_time_efficient, is_memory_efficient = check_solution(
-            test_input, result, proc, time_limit, memory_limit
+        check_result = check_solution(
+            test_input, user_result, proc, time_limit, memory_limit
         )
         
+        # Unpack result (supports optional 4th element for custom error message)
+        is_accurate, is_time_efficient, is_memory_efficient = check_result[:3]
+        custom_message = check_result[3] if len(check_result) > 3 else None
+        
         if not is_accurate:
-            print(f"❌  Wrong answer at test {test_num}")
+            if custom_message:
+                print(f"❌  {custom_message}")
+            else:
+                print(f"❌  Wrong answer at test {test_num}")
             all_passed = False
             break
         elif not is_time_efficient:

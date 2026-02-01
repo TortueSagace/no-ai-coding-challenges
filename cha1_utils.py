@@ -24,7 +24,19 @@ def check_solution(test_input, result, proc, tmax, rmax):
     t0, r0 = perf_counter(), proc.memory_info().rss
     
     n, s = test_input
-    k, p = result
+    
+    # Handle invalid return value
+    if result is None:
+        return (False, True, True, "Invalid output format. Does your \"my_solution\" function return a (k, p) tuple?")
+    
+    try:
+        k, p = result
+    except (TypeError, ValueError):
+        return (False, True, True, "Invalid output format. Does your \"my_solution\" function return a (k, p) tuple?")
+    
+    # Ensure p is a list (handle None case)
+    if p is None:
+        p = []
     
     # Handle empty subsequence
     if k == 0 or not p:
@@ -67,7 +79,7 @@ def check_solution(test_input, result, proc, tmax, rmax):
     is_time_efficient = (t1 - t0 <= tmax)
     is_memory_efficient = (r1 - r0 <= rmax)
     
-    return (is_accurate, is_time_efficient, is_memory_efficient)
+    return (is_accurate, is_time_efficient, is_memory_efficient, None)
 
 
 def parse_tests(file_path):
@@ -103,3 +115,30 @@ def parse_tests(file_path):
         idx += 2
     
     return tests
+
+
+def parse_samples(sample_input):
+    """
+    Parse sample input string into test cases.
+    
+    Parameters:
+    -----------
+    sample_input : str
+        Multi-line string with test cases in Codeforces format
+    
+    Returns:
+    --------
+    list : List of tuples (n, s) where s is a list of integers (0s and 1s)
+    """
+    lines = sample_input.strip().split('\n')
+    t = int(lines[0])
+    samples = []
+    idx = 1
+    
+    for _ in range(t):
+        n = int(lines[idx])
+        s = [int(c) for c in lines[idx + 1].strip()]
+        samples.append((n, s))
+        idx += 2
+    
+    return samples
