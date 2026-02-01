@@ -170,7 +170,7 @@ def _fit_complexity(n_values, measurements):
     return (best[0], best[1], best[2], results)
 
 
-def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix=""):
+def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix="", show_estimation=True):
     """
     Create a beautiful plot showing time and memory complexity analysis.
     
@@ -182,6 +182,8 @@ def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix=""):
         Dictionary mapping n -> list of memory usages
     title_prefix : str
         Optional prefix for the plot title
+    show_estimation : bool
+        Whether to show complexity estimation annotations (default: True)
     """
     # Set up the style - use a style that's likely to be available
     try:
@@ -223,16 +225,17 @@ def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix=""):
                  color=color_primary, markersize=8, capsize=5, capthick=2,
                  label='Measured time', ecolor=color_primary, alpha=0.7)
     
-    # Plot fitted curve
-    a, b = time_fit[2]
-    if time_fit[0] == "O(1)":
-        # Horizontal line for O(1)
-        ax1.axhline(y=a, color=color_fit, linestyle='--', linewidth=2.5,
-                    label=f'Fitted: {time_fit[0]}')
-    elif a > 0:
-        y_fit = a * time_fit[1](n_smooth) + b
-        ax1.plot(n_smooth, y_fit, '--', color=color_fit, linewidth=2.5,
-                 label=f'Fitted: {time_fit[0]}')
+    # Plot fitted curve (only if show_estimation is True)
+    if show_estimation:
+        a, b = time_fit[2]
+        if time_fit[0] == "O(1)":
+            # Horizontal line for O(1)
+            ax1.axhline(y=a, color=color_fit, linestyle='--', linewidth=2.5,
+                        label=f'Fitted: {time_fit[0]}')
+        elif a > 0:
+            y_fit = a * time_fit[1](n_smooth) + b
+            ax1.plot(n_smooth, y_fit, '--', color=color_fit, linewidth=2.5,
+                     label=f'Fitted: {time_fit[0]}')
     
     ax1.set_xlabel('Input Size (n)', fontsize=12, fontweight='bold')
     ax1.set_ylabel('Execution Time (μs)', fontsize=12, fontweight='bold')
@@ -240,20 +243,25 @@ def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix=""):
     ax1.legend(loc='upper left', fontsize=10)
     ax1.set_ylim(bottom=0)  # Start from 0
     
-    # Add complexity annotation
-    ax1.annotate(f'Estimated: {time_fit[0]}', 
-                 xy=(0.95, 0.05), xycoords='axes fraction',
-                 fontsize=12, fontweight='bold', color=color_fit,
-                 ha='right', va='bottom',
-                 bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
-                          edgecolor=color_fit, alpha=0.9))
+    # Add complexity annotation (only if show_estimation is True)
+    if show_estimation:
+        ax1.annotate(f'Estimated: {time_fit[0]}', 
+                     xy=(0.95, 0.05), xycoords='axes fraction',
+                     fontsize=12, fontweight='bold', color=color_fit,
+                     ha='right', va='bottom',
+                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                              edgecolor=color_fit, alpha=0.9))
     
     # ==================== MEMORY PLOT ====================
     # Check if memory data is all zeros
     all_zero_memory = all(m == 0 for m in avg_memory)
     
     if all_zero_memory:
-        ax2.text(0.5, 0.5, 'Memory changes too small\nto measure accurately\n\nEstimated: O(1)', 
+        if show_estimation:
+            msg = 'Memory changes too small\nto measure accurately\n\nEstimated: O(1)'
+        else:
+            msg = 'Memory changes too small\nto measure accurately'
+        ax2.text(0.5, 0.5, msg, 
                  transform=ax2.transAxes, fontsize=14, ha='center', va='center',
                  bbox=dict(boxstyle='round,pad=0.5', facecolor='white', 
                           edgecolor=color_secondary, alpha=0.9),
@@ -265,26 +273,28 @@ def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix=""):
                      color=color_secondary, markersize=8, capsize=5, capthick=2,
                      label='Measured memory', ecolor=color_secondary, alpha=0.7)
         
-        # Plot fitted curve
-        a, b = memory_fit[2]
-        if memory_fit[0] == "O(1)":
-            ax2.axhline(y=a, color=color_fit2, linestyle='--', linewidth=2.5,
-                        label=f'Fitted: {memory_fit[0]}')
-        elif a > 0:
-            y_fit = a * memory_fit[1](n_smooth) + b
-            ax2.plot(n_smooth, y_fit, '--', color=color_fit2, linewidth=2.5,
-                     label=f'Fitted: {memory_fit[0]}')
+        # Plot fitted curve (only if show_estimation is True)
+        if show_estimation:
+            a, b = memory_fit[2]
+            if memory_fit[0] == "O(1)":
+                ax2.axhline(y=a, color=color_fit2, linestyle='--', linewidth=2.5,
+                            label=f'Fitted: {memory_fit[0]}')
+            elif a > 0:
+                y_fit = a * memory_fit[1](n_smooth) + b
+                ax2.plot(n_smooth, y_fit, '--', color=color_fit2, linewidth=2.5,
+                         label=f'Fitted: {memory_fit[0]}')
         
         ax2.legend(loc='upper left', fontsize=10)
         ax2.set_ylim(bottom=0)
         
-        # Add complexity annotation
-        ax2.annotate(f'Estimated: {memory_fit[0]}', 
-                     xy=(0.95, 0.05), xycoords='axes fraction',
-                     fontsize=12, fontweight='bold', color=color_fit2,
-                     ha='right', va='bottom',
-                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
-                              edgecolor=color_fit2, alpha=0.9))
+        # Add complexity annotation (only if show_estimation is True)
+        if show_estimation:
+            ax2.annotate(f'Estimated: {memory_fit[0]}', 
+                         xy=(0.95, 0.05), xycoords='axes fraction',
+                         fontsize=12, fontweight='bold', color=color_fit2,
+                         ha='right', va='bottom',
+                         bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                                  edgecolor=color_fit2, alpha=0.9))
     
     ax2.set_xlabel('Input Size (n)', fontsize=12, fontweight='bold')
     ax2.set_ylabel('Memory Usage (KB)', fontsize=12, fontweight='bold')
@@ -304,7 +314,7 @@ def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix=""):
 
 def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests,
                         time_limit, memory_limit, get_input_size=None, plot=True,
-                        plot_title=""):
+                        plot_title="", show_estimation=True):
     """
     Evaluate a solution on hidden test cases from a file.
     
@@ -333,6 +343,9 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
         Requires get_input_size to be provided
     plot_title : str
         Optional title prefix for the complexity plot
+    show_estimation : bool
+        Whether to show complexity estimation on the plot (default: True)
+        Set to False when n range is too small for reliable estimation
     
     Returns:
     --------
@@ -406,9 +419,11 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
         # Plot complexity analysis if enabled and we have data
         if plot and get_input_size is not None and time_by_n:
             time_complexity, space_complexity = _plot_complexity_analysis(
-                time_by_n, memory_by_n, title_prefix=plot_title
+                time_by_n, memory_by_n, title_prefix=plot_title,
+                show_estimation=show_estimation
             )
-            print(f"\n📊 Estimated Time Complexity: {time_complexity}")
-            print(f"📊 Estimated Space Complexity: {space_complexity}")
+            if show_estimation:
+                print(f"\n📊 Estimated Time Complexity: {time_complexity}")
+                print(f"📊 Estimated Space Complexity: {space_complexity}")
     
     return all_passed

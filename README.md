@@ -1,6 +1,6 @@
 # No-AI Coding Challenges
 
-A series of programming puzzles designed to keep your brain sharp in a world where AI usually codes everything for you. By Ir. Alexandre Le Mercier.
+A series of programming puzzles designed to keep your brain sharp in a world where AI usually codes everything for you.
 
 ## Repository Structure
 
@@ -168,13 +168,14 @@ The `utils.py` file provides shared functionality:
 ### `evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory_limit)`
 Evaluates the solution on provided sample test cases.
 
-### `internal_evaluation(test_file_path, my_solution, check_solution, parse_tests, time_limit, memory_limit, get_input_size=None, plot=True, plot_title="")`
+### `internal_evaluation(test_file_path, my_solution, check_solution, parse_tests, time_limit, memory_limit, get_input_size=None, plot=True, plot_title="", show_estimation=True)`
 Evaluates on hidden test cases with optional complexity analysis plotting.
 
 **Parameters:**
 - `get_input_size`: Function to extract n from test_input (enables plotting)
 - `plot`: Whether to show complexity analysis graphs
 - `plot_title`: Title prefix for the complexity plot
+- `show_estimation`: Whether to show complexity estimation (default: True). Set to `False` when n range is too small for reliable estimation (e.g., n ≤ 100)
 
 ## Notebook Template
 
@@ -216,7 +217,8 @@ internal_evaluation(
     test_file_path, my_solution, check_solution, parse_tests,
     TIME_LIMIT, MEMORY_LIMIT,
     get_input_size=get_input_size,
-    plot_title='Challenge X Name'
+    plot_title='Challenge X Name',
+    show_estimation=True  # Set to False if n range is too small (e.g., n ≤ 100)
 )
 ```
 
@@ -243,6 +245,8 @@ When `get_input_size` is provided, the evaluation automatically:
 4. **Validation**: Test your `check_solution` with both correct and incorrect solutions
 
 5. **Error Messages**: Provide helpful custom error messages for common mistakes
+
+6. **Complexity Estimation**: Set `show_estimation=False` when n range is too small (n ≤ 100) for reliable empirical complexity analysis. The constant overhead (~50μs) dominates at small n, making all algorithms appear O(1). For reliable estimation, n should span 2-3 orders of magnitude (e.g., 10 to 10,000).
 
 ## License
 

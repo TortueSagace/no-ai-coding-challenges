@@ -45,12 +45,15 @@ def check_solution(test_input, result, proc, tmax, rmax):
     
     # Handle invalid return value
     if result is None:
-        return (False, True, True, "Invalid output format. Does your \"my_solution\" function return a (k, p) tuple?")
+        return (False, True, True, 
+                "Invalid output: function returned None. Did you run the cell containing your solution?")
     
     try:
         k, p = result
     except (TypeError, ValueError):
-        return (False, True, True, "Invalid output format. Does your \"my_solution\" function return a (k, p) tuple?")
+        return (False, True, True, 
+                f"Invalid output format: expected (k, indices) tuple, got {type(result).__name__}. "
+                "Make sure your function returns (k, indices).")
     
     # Ensure p is a list (handle None case)
     if p is None:
