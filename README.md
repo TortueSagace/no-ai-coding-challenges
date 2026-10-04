@@ -236,6 +236,10 @@ Evaluates the solution on provided sample test cases with a detailed results tab
 ### `internal_evaluation(test_file_path, my_solution, check_solution, parse_tests, time_limit, memory_limit, get_input_size=None, plot=True, plot_title="", show_estimation=True)`
 Evaluates on hidden test cases with optional complexity analysis plotting.
 
+Each call of `my_solution` must finish within `time_limit` seconds and use at most `memory_limit` bytes of extra memory
+(a call over the time limit is timed once more to absorb noise). Otherwise the evaluation stops with
+"Time limit exceeded" or "Memory limit exceeded". `evaluate_on_samples` applies the same limits.
+
 **Parameters:**
 - `get_input_size`: Function to extract n from test_input (enables plotting)
 - `plot`: Whether to show complexity analysis graphs

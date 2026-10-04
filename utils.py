@@ -4,12 +4,37 @@ from tqdm.auto import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from copy import deepcopy
 import os
 
 
 def get_trss(proc):
     """Get current time and RSS memory usage."""
     return perf_counter(), proc.memory_info().rss
+
+
+def _confirm_time(my_solution, test_input, exec_time, time_limit):
+    """
+    A call over the time limit is timed once more (on a copy of its input), so that a garbage
+    collection pause or an OS hiccup cannot fail a fast solution. Returns the best of both timings.
+    """
+    if exec_time <= time_limit:
+        return exec_time
+    t_start = perf_counter()
+    try:
+        my_solution(*deepcopy(test_input))
+    except Exception:
+        return exec_time
+    return min(exec_time, perf_counter() - t_start)
+
+
+def _limit_violation(exec_time, mem_used, time_limit, memory_limit):
+    """Message describing an exceeded limit, or None."""
+    if exec_time > time_limit:
+        return f"Time limit exceeded: {exec_time:.2f} s > {time_limit:g} s"
+    if mem_used > memory_limit:
+        return f"Memory limit exceeded: {mem_used / 1e6:.0f} MB > {memory_limit / 1e6:.0f} MB"
+    return None
 
 
 def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory_limit,
@@ -27,9 +52,9 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
         Function with signature check_solution(sample, result, proc, tmax, rmax)
         Returns (is_accurate, is_time_efficient, is_memory_efficient, custom_message)
     time_limit : float
-        Maximum allowed time in seconds
+        Maximum time in seconds for one call of my_solution (enforced)
     memory_limit : float
-        Maximum allowed memory in bytes
+        Maximum extra RSS memory in bytes for one call of my_solution (enforced)
     format_input : callable, optional
         Function to format input for display: format_input(sample) -> str
         If None, uses default repr with truncation
@@ -64,7 +89,10 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
         
         exec_time = t_end - t_start
         mem_used = max(0, mem_after - mem_before)
-        
+        if not runtime_error:
+            exec_time = _confirm_time(my_solution, sample, exec_time, time_limit)
+        violation = None if runtime_error else _limit_violation(exec_time, mem_used, time_limit, memory_limit)
+
         # Check solution
         if runtime_error:
             is_accurate = False
@@ -91,6 +119,9 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
         if runtime_error:
             status = "❌ Error"
             status_detail = runtime_error[:30] + "..." if len(runtime_error) > 30 else runtime_error
+        elif violation:
+            status = "❌ TLE" if violation.startswith("Time") else "❌ MLE"
+            status_detail = violation
         elif not is_accurate:
             status = "❌ Wrong"
             status_detail = custom_message if custom_message else "Invalid answer"
@@ -107,9 +138,9 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
             'status_detail': status_detail
         })
         
-        if not is_accurate:
+        if status != "✅ Pass":
             all_passed = False
-    
+
     # Display results table
     _print_results_table(results_table)
     
@@ -447,9 +478,10 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
         Function that parses the test file and returns a list of test inputs
         Signature: parse_tests(file_path) -> list of tuples
     time_limit : float
-        Maximum allowed time in seconds
+        Maximum time in seconds for one call of my_solution (enforced, like a Codeforces
+        test file holding this single test case)
     memory_limit : float
-        Maximum allowed memory in bytes
+        Maximum extra RSS memory in bytes for one call of my_solution (enforced)
     get_input_size : callable, optional
         Function that extracts the size parameter (n) from test_input for plotting
         Signature: get_input_size(test_input) -> int
@@ -498,13 +530,22 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
         
         t_end = perf_counter()
         mem_after = proc.memory_info().rss
-        
+        exec_time = _confirm_time(my_solution, test_input, t_end - t_start, time_limit)
+        mem_used = max(0, mem_after - mem_before)
+
         # Record metrics for complexity analysis
         if get_input_size is not None:
             n = get_input_size(test_input)
-            time_by_n[n].append(t_end - t_start)
-            memory_by_n[n].append(max(0, mem_after - mem_before))
-        
+            time_by_n[n].append(exec_time)
+            memory_by_n[n].append(mem_used)
+
+        violation = _limit_violation(exec_time, mem_used, time_limit, memory_limit)
+        if violation:
+            size = f" (n = {get_input_size(test_input)})" if get_input_size is not None else ""
+            print(f"\n❌  {violation} at test {test_num}{size}")
+            all_passed = False
+            break
+
         check_result = check_solution(
             test_input, user_result, proc, time_limit, memory_limit
         )
