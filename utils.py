@@ -6,6 +6,19 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from copy import deepcopy
 import os
+import traceback
+
+
+def _user_traceback(e):
+    """
+    Full traceback of an exception raised by my_solution, starting at the user's own code:
+    the frames of this file (the evaluation code that called my_solution) are dropped.
+    """
+    here = os.path.abspath(__file__)
+    tb = e.__traceback__
+    while tb is not None and os.path.abspath(tb.tb_frame.f_code.co_filename) == here:
+        tb = tb.tb_next
+    return "".join(traceback.format_exception(type(e), e, tb))
 
 
 def get_trss(proc):
@@ -64,14 +77,17 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
     
     Returns:
     --------
-    bool : True if all tests passed
+    None : the results are printed. If my_solution raised an exception, the full traceback of the
+    first one (from the user's code onwards) is printed after the table. Returning None keeps a
+    notebook cell that ends with this call from also displaying a value.
     """
     proc = Process(os.getpid())
     all_passed = True
-    
+    first_crash = None  # (sample number, traceback) of the first exception raised by my_solution
+
     # Collect results for table display
     results_table = []
-    
+
     for i, sample in enumerate(samples, 1):
         # Measure execution
         t_start = perf_counter()
@@ -82,8 +98,10 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
             runtime_error = None
         except Exception as e:
             user_result = None
-            runtime_error = str(e)
-        
+            runtime_error = f"{type(e).__name__}: {e}"
+            if first_crash is None:
+                first_crash = (i, _user_traceback(e))
+
         t_end = perf_counter()
         mem_after = proc.memory_info().rss
         
@@ -156,8 +174,10 @@ def evaluate_on_samples(samples, my_solution, check_solution, time_limit, memory
             if r['status'] != "✅ Pass" and r['status_detail']:
                 print(f"    First failure: {r['status_detail']}")
                 break
-    
-    return all_passed
+        if first_crash:
+            index, trace = first_crash
+            print(f"\nRuntime error on sample {index}:\n")
+            print(trace, end="")
 
 
 def _truncate_repr(obj, max_len):
@@ -525,7 +545,8 @@ def internal_evaluation(test_file_path, my_solution, check_solution, parse_tests
         try:
             user_result = my_solution(*test_input)
         except Exception as e:
-            print(f"\n❌  Runtime error at test {test_num}: {e}")
+            print(f"\n❌  Runtime error at test {test_num}:\n")
+            print(_user_traceback(e), end="")
             return False
         
         t_end = perf_counter()
