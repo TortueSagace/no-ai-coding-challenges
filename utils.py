@@ -241,28 +241,43 @@ def _print_results_table(results):
         print(row)
 
 
-def _fit_complexity(n_values, measurements):
+def _pairs(m, limit=500_000):
+    """Index pairs (i, j), i < j, for the Theil-Sen slopes; a fixed random sample when there are too many."""
+    if m * (m - 1) // 2 <= limit:
+        return np.triu_indices(m, 1)
+    rng = np.random.default_rng(0)
+    i, j = rng.integers(0, m, limit), rng.integers(0, m, limit)
+    keep = i != j
+    return i[keep], j[keep]
+
+
+def _fit_complexity(n_values, measurements, tolerance=0.05):
     """
-    Fit various complexity functions to the measurements and find the best match.
-    
+    Estimate the complexity class of measurements taken at sizes n_values.
+
+    measurements[i] is one value, or the list of every value measured at size n_values[i].
+    Each class f is fitted as y = a * f(n) + b (growth a > 0, overhead b >= 0) with the Theil-Sen
+    estimator (median of the pairwise slopes): unlike least squares, it is not dragged by single
+    slow calls (garbage collection, OS scheduling). Fits are compared by their total absolute error,
+    and the slowest-growing class within `tolerance` of the best error wins: over a limited range
+    of n, n log n is almost a straight line, and noise alone must not turn O(n) into O(n log n).
+
     Returns:
     --------
     tuple : (best_name, best_func, best_params, all_results)
     """
-    n = np.array(n_values, dtype=float)
-    y = np.array(measurements, dtype=float)
-    
+    n = np.concatenate([np.full(np.size(m), float(k)) for k, m in zip(n_values, measurements)])
+    y = np.concatenate([np.ravel(np.asarray(m, dtype=float)) for m in measurements])
+
     # Handle edge case: all measurements are zero or constant
-    if np.std(y) < 1e-10:
-        return ("O(1)", lambda n: np.ones_like(n), (np.mean(y), 0), [])
-    
+    if len(y) < 2 or np.std(y) < 1e-10:
+        return ("O(1)", lambda n: np.ones_like(n), (float(np.median(y)), 0), [])
+
     # Avoid division by zero and log of zero
     n_safe = np.maximum(n, 1)
-    
-    # Calculate coefficient of variation to check if data is essentially constant
-    cv = np.std(y) / (np.mean(y) + 1e-10)
-    
-    # Define complexity functions: (name, transform_function)
+    i, j = _pairs(len(y))
+
+    # Define complexity functions: (name, transform_function), from the slowest growth to the fastest
     complexities = [
         ("O(1)", lambda n: np.ones_like(n)),
         ("O(log n)", lambda n: np.log2(np.maximum(n, 1))),
@@ -273,68 +288,34 @@ def _fit_complexity(n_values, measurements):
         ("O(2ⁿ)", lambda n: 2 ** np.minimum(n, 30)),  # Cap to avoid overflow
     ]
     
-    results = []
-    
+    results = []  # (name, func, (a, b), total absolute error)
+
     for name, func in complexities:
-        try:
-            x = func(n_safe)
-            
-            # For O(1), we fit y = constant
-            if name == "O(1)":
-                mean_y = np.mean(y)
-                y_pred = np.full_like(y, mean_y)
-                ss_res = np.sum((y - y_pred) ** 2)
-                ss_tot = np.sum((y - mean_y) ** 2)
-                # R² for constant model is 0 by definition (unless data is constant)
-                r2 = 0.0 if ss_tot > 1e-10 else 1.0
-                results.append((name, func, (mean_y, 0), r2))
-                continue
-            
-            # Skip if all x values are the same (can't fit)
-            if np.std(x) < 1e-10:
-                continue
-            
-            # Linear regression: y = a * x + b
-            # Using least squares
-            A = np.vstack([x, np.ones(len(x))]).T
-            coeffs, residuals, rank, s = np.linalg.lstsq(A, y, rcond=None)
-            a, b = coeffs
-            
-            # Only consider positive scaling factors for non-constant models
-            if a <= 0:
-                continue
-            
-            # Calculate R² score
-            y_pred = a * x + b
-            ss_res = np.sum((y - y_pred) ** 2)
-            ss_tot = np.sum((y - np.mean(y)) ** 2)
-            
-            if ss_tot < 1e-10:
-                r2 = 1.0 if ss_res < 1e-10 else 0.0
-            else:
-                r2 = 1 - (ss_res / ss_tot)
-            
-            results.append((name, func, (a, b), r2))
-        except Exception:
+        # For O(1), we fit y = constant
+        if name == "O(1)":
+            c = float(np.median(y))
+            results.append((name, func, (c, 0), float(np.sum(np.abs(y - c)))))
             continue
-    
-    if not results:
-        return ("O(1)", lambda n: np.ones_like(n), (np.mean(y), 0), [])
-    
-    # Sort by R² score (descending)
-    results.sort(key=lambda x: x[3], reverse=True)
-    
-    # If the best R² is very low (< 0.5) and data has low coefficient of variation,
-    # it's likely O(1) with noise
-    best = results[0]
-    if best[3] < 0.5 and cv < 0.3:
-        # Find O(1) in results or return it
-        for r in results:
-            if r[0] == "O(1)":
-                return r
-        return ("O(1)", lambda n: np.ones_like(n), (np.mean(y), 0), results)
-    
-    return (best[0], best[1], best[2], results)
+
+        # Theil-Sen slope over the pairs of measurements taken at different sizes
+        x = func(n_safe)
+        dx = x[j] - x[i]
+        keep = dx != 0
+        if not keep.any():
+            continue
+        a = float(np.median((y[j] - y[i])[keep] / dx[keep]))
+
+        # Only consider positive scaling factors for non-constant models
+        if a <= 0:
+            continue
+        b = max(0.0, float(np.median(y - a * x)))
+        results.append((name, func, (a, b), float(np.sum(np.abs(y - a * x - b)))))
+
+    # The slowest-growing class that fits about as well as the best one
+    best_error = min(r[3] for r in results)
+    for r in results:
+        if r[3] <= best_error * (1 + tolerance):
+            return (r[0], r[1], r[2], results)
 
 
 def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix="", show_estimation=True):
@@ -380,9 +361,9 @@ def _plot_complexity_analysis(time_by_n, memory_by_n, title_prefix="", show_esti
     avg_memory = [np.mean(memory_by_n[n]) / 1024 for n in n_values]  # Convert to KB
     std_memory = [np.std(memory_by_n[n]) / 1024 for n in n_values]
     
-    # Fit complexity curves
-    time_fit = _fit_complexity(n_values, avg_times)
-    memory_fit = _fit_complexity(n_values, avg_memory)
+    # Fit complexity curves on every measurement (same units as the plot)
+    time_fit = _fit_complexity(n_values, [np.array(time_by_n[n]) * 1e6 for n in n_values])
+    memory_fit = _fit_complexity(n_values, [np.array(memory_by_n[n]) / 1024 for n in n_values])
     
     # Generate smooth curve for plotting
     n_smooth = np.linspace(min(n_values), max(n_values), 100)
