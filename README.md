@@ -2,15 +2,7 @@
 
 A series of programming puzzles designed to keep your brain sharp in a world where AI usually codes everything for you.
 
-**Assisted Coding Challenges** (notebooks `A1_...`, files `accN_*`) are a second series: tougher problems, with a small
-AI assistant in the notebook (`assistant.py`). It is a fast chat model without reasoning, served for free by
-[OpenRouter](https://openrouter.ai), which has read the statement: it can explain, give hints and review your code.
-`ask("...")` attaches your solution cell and its sample results automatically; `fix()` as the last line of your
-solution cell replaces it with a corrected version (`undo()` restores it). The assistant only ever sees the statement,
-the sample tests and your solution cell, never the other cells.
-To use it, get a free key at [openrouter.ai/keys](https://openrouter.ai/keys), then:
-- on Kaggle: *Add-ons → Secrets* → add `OPENROUTER_API_KEY` and tick it for the notebook (keep Internet on);
-- locally: put `OPENROUTER_API_KEY=...` in a `.env` file next to the notebook, or set the environment variable.
+Looking for tougher problems with a small AI assistant by your side? See [Assisted Coding Challenges](https://github.com/TortueSagace/assisted-coding-challenges).
 
 ## Repository Structure
 
