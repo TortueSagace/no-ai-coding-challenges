@@ -242,6 +242,9 @@ Each call of `my_solution` must finish within `time_limit` seconds and use at mo
 (a call over the time limit is timed once more to absorb noise). Otherwise the evaluation stops with
 "Time limit exceeded" or "Memory limit exceeded". `evaluate_on_samples` applies the same limits.
 
+Wrong answers and runtime errors don't stop the evaluation: every hidden test runs, then the progress bar turns red
+with the percentage of failed tests, followed by the first failure (with its traceback for a runtime error).
+
 **Parameters:**
 - `get_input_size`: Function to extract n from test_input (enables plotting)
 - `plot`: Whether to show complexity analysis graphs
